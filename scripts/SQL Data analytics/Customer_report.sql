@@ -1,7 +1,7 @@
 /*
 ===============================================================================
 Script Name   : Customer Report View
-File Name     : customer_report.sql
+File Name     : Customer_report.sql
 Database      : Data Warehouse (Gold Layer)
 Author        : Sanganna Jalade
 Date Created  : 2026-07-27
