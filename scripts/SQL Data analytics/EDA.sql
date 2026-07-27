@@ -17,6 +17,7 @@ Script Structure:
     3. Aggregate Business Metrics & KPI Summary
     4. Grouping & Distribution Analysis
     5. Ranking & Top/Bottom N Analysis
+    6. Advanced Analytics & Performance Trends
 ===============================================================================
 */
 
@@ -24,192 +25,329 @@ USE DataWarehouse;
 GO
 
 
+-- ============================================================================
+-- 1. DATABASE & SCHEMA EXPLORATION
+-- ============================================================================
 
--- Explore All objects in the database
-SELECT * FROM INFORMATION_SCHEMA.TABLES
+-- Explore all tables in the database
+SELECT * FROM INFORMATION_SCHEMA.TABLES;
 
--- Explore all Columns in the database
+-- Explore all columns in dim_customers
 SELECT * FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_NAME ='dim_customers'
-
--- Explore All countries our customers come from 
-SELECT DISTINCT country FROM gold.dim_customers
+WHERE TABLE_NAME = 'dim_customers';
 
 
--- Explore All Categories "The major Divisions"
-SELECT DISTINCT category,subcategory,product_name FROM gold.dim_products
-ORDER BY 1,2,3
+-- ============================================================================
+-- 2. DIMENSION & MEASURE EXPLORATION
+-- ============================================================================
 
--- Find the date of the first and last order
+-- Explore all countries our customers come from 
+SELECT DISTINCT country 
+FROM gold.dim_customers;
 
+-- Explore all product hierarchy (Category -> Subcategory -> Product Name)
+SELECT DISTINCT category, subcategory, product_name 
+FROM gold.dim_products
+ORDER BY 1, 2, 3;
+
+-- Find order date boundaries and operational span
 SELECT
-MIN(order_date) AS first_order_date ,
-MAX(order_date) AS last_order_date,
-DATEDIFF(year,MIN(order_date),MAX(order_date)) FROM gold.fact_sales
+    MIN(order_date) AS first_order_date,
+    MAX(order_date) AS last_order_date,
+    DATEDIFF(year, MIN(order_date), MAX(order_date)) AS total_years_operating 
+FROM gold.fact_sales;
 
--- FInd the youngest and the oldest customer
-
-SELECT MIN(birthdate) AS oldest_birthdate,
-DATEDIFF(YEAR,MIN(birthdate),GETDATE()) AS oldest_age,
-MAX(birthdate) AS youngest_birthdate,
-DATEDIFF(YEAR,MAX(birthdate),GETDATE()) AS youngest_age
-FROM gold.dim_customers
-
--- Find the Total Sales
-SELECT SUM(sales_amount) AS total_sales FROM gold.fact_sales
-
--- Find how many items are sold
-SELECT SUM(quantity) AS total_quantity FROM gold.fact_sales
-
--- Find the average selling price
-SELECT AVG(price) AS avg_price FROM gold.fact_sales
-
--- Find the total number of orders
-SELECT COUNT(DISTINCT(order_number)) AS total_orders FROM gold.fact_sales
-
--- Find the total number of products
-SELECT COUNT(product_key) AS total_products FROM gold.dim_products
-
--- Find the total number of customers
-SELECT COUNT(customer_key) AS total_customers FROM gold.dim_customers
-
--- Find the total number of customers that has placed an order
-SELECT COUNT(DISTINCT( customer_key)) AS total_customers FROM gold.fact_sales
+-- Find youngest and oldest customer details
+SELECT 
+    MIN(birthdate) AS oldest_birthdate,
+    DATEDIFF(YEAR, MIN(birthdate), GETDATE()) AS oldest_age,
+    MAX(birthdate) AS youngest_birthdate,
+    DATEDIFF(YEAR, MAX(birthdate), GETDATE()) AS youngest_age
+FROM gold.dim_customers;
 
 
+-- ============================================================================
+-- 3. AGGREGATE BUSINESS METRICS & KPI SUMMARY
+-- ============================================================================
 
+-- Find total sales
+SELECT SUM(sales_amount) AS total_sales FROM gold.fact_sales;
 
--- Generate a Report that shows all key metrics of the business
+-- Find total items sold
+SELECT SUM(quantity) AS total_quantity FROM gold.fact_sales;
 
-SELECT 'Total Sales' AS measure_name,SUM(sales_amount) AS measure_value FROM gold.fact_sales 
+-- Find average selling price
+SELECT AVG(price) AS avg_price FROM gold.fact_sales;
+
+-- Find total number of orders
+SELECT COUNT(DISTINCT order_number) AS total_orders FROM gold.fact_sales;
+
+-- Find total number of products
+SELECT COUNT(product_key) AS total_products FROM gold.dim_products;
+
+-- Find total number of registered customers
+SELECT COUNT(customer_key) AS total_customers FROM gold.dim_customers;
+
+-- Find total number of active customers (who have placed an order)
+SELECT COUNT(DISTINCT customer_key) AS total_active_customers FROM gold.fact_sales;
+
+-- Generate a consolidated report of key business metrics
+SELECT 'Total Sales' AS measure_name, SUM(sales_amount) AS measure_value FROM gold.fact_sales 
 UNION ALL
-SELECT 'Total Quantity' AS measure_name,SUM(quantity) AS measure_value FROM gold.fact_sales 
+SELECT 'Total Quantity', SUM(quantity) FROM gold.fact_sales 
 UNION ALL
-SELECT 'Average Price',AVG(price) FROM gold.fact_sales
+SELECT 'Average Price', AVG(price) FROM gold.fact_sales
 UNION ALL
-SELECT 'Total Nr. Orders',COUNT(DISTINCT Order_number) FROM gold.fact_sales
+SELECT 'Total Nr. Orders', COUNT(DISTINCT order_number) FROM gold.fact_sales
 UNION ALL
 SELECT 'Total Nr. Products', COUNT(product_name) FROM gold.dim_products
 UNION ALL 
-SELECT 'Total Nr. Customers', COUNT(customer_key) FROM gold.dim_customers
+SELECT 'Total Nr. Customers', COUNT(customer_key) FROM gold.dim_customers;
 
 
+-- ============================================================================
+-- 4. GROUPING & DISTRIBUTION ANALYSIS
+-- ============================================================================
 
--- Find total Customers by countries
-
+-- Total customers by country
 SELECT 
-country,COUNT(Customer_key) AS total_customers FROM gold.dim_customers
+    country,
+    COUNT(customer_key) AS total_customers 
+FROM gold.dim_customers
 GROUP BY country
-ORDER BY total_customers DESC
+ORDER BY total_customers DESC;
 
--- Find total customerrs by gender
+-- Total customers by gender
 SELECT 
-gender,COUNT(customer_key) AS total_customers FROM gold.dim_customers
+    gender,
+    COUNT(customer_key) AS total_customers 
+FROM gold.dim_customers
 GROUP BY gender
-ORDER BY total_customers DESC
+ORDER BY total_customers DESC;
 
-
--- find total products by category 
+-- Total products by category 
 SELECT
-category,COUNT(product_name) AS total_products FROM gold.dim_products
+    category,
+    COUNT(product_name) AS total_products 
+FROM gold.dim_products
 GROUP BY category
-ORDER BY total_products DESC
+ORDER BY total_products DESC;
 
--- what is the average costs in each category?
+-- Average cost in each category
 SELECT
-category,AVG(cost) AS avg_costs FROM gold.dim_products
+    category,
+    AVG(cost) AS avg_costs 
+FROM gold.dim_products
 GROUP BY category
-ORDER BY avg_costs DESC
+ORDER BY avg_costs DESC;
 
--- what is the total revenue generated for each category ?
+-- Total revenue generated by category
 SELECT 
-p.category ,
-SUM(f.sales_amount)AS total_revenue FROM gold.fact_sales f
+    p.category,
+    SUM(f.sales_amount) AS total_revenue 
+FROM gold.fact_sales f
 LEFT JOIN gold.dim_products p ON p.product_key = f.product_key
 GROUP BY p.category
-ORDER BY total_revenue DESC
+ORDER BY total_revenue DESC;
 
--- Find total revenue is generated by each customer
-
+-- Total revenue generated per customer
 SELECT 
-c.customer_key,
-c.first_name,
-c.last_name,
-SUM(f.sales_amount) AS total_revenue
+    c.customer_key,
+    c.first_name,
+    c.last_name,
+    SUM(f.sales_amount) AS total_revenue
 FROM gold.fact_sales f
-LEFT JOIN gold.dim_customers c on c.customer_key=f.customer_key
-GROUP BY
-c.customer_key,
-c.first_name,
-c.last_name
-ORDER BY total_revenue DESC
+LEFT JOIN gold.dim_customers c ON c.customer_key = f.customer_key
+GROUP BY c.customer_key, c.first_name, c.last_name
+ORDER BY total_revenue DESC;
 
-
--- what is the distribution of sold items across countries ?
+-- Distribution of sold items across countries
 SELECT 
-c.country,
-SUM(f.quantity) AS total_sold_items
+    c.country,
+    SUM(f.quantity) AS total_sold_items
 FROM gold.fact_sales f
-LEFT JOIN gold.dim_customers c on c.customer_key=f.customer_key
-GROUP BY
-c.country
-ORDER BY total_sold_items DESC
+LEFT JOIN gold.dim_customers c ON c.customer_key = f.customer_key
+GROUP BY c.country
+ORDER BY total_sold_items DESC;
 
 
---Ranking Analysis 
+-- ============================================================================
+-- 5. RANKING & TOP/BOTTOM N ANALYSIS
+-- ============================================================================
 
--- Which 5 products generate the highest revenue ?
-
+-- Top 5 highest revenue products
 SELECT TOP 5
-	p.product_name,
-	SUM(f.sales_amount) AS total_revenue
+    p.product_name,
+    SUM(f.sales_amount) AS total_revenue
 FROM gold.fact_sales f
-LEFT JOIN gold.dim_products p
-ON p.product_key=f.product_key
+LEFT JOIN gold.dim_products p ON p.product_key = f.product_key
 GROUP BY p.product_name
-ORDER BY total_revenue DESC
+ORDER BY total_revenue DESC;
 
--- What are the 5 worst-performing products in terms of sales?
+-- Bottom 5 lowest revenue products
 SELECT TOP 5
-	p.product_name,
-	SUM(f.sales_amount) AS total_revenue
+    p.product_name,
+    SUM(f.sales_amount) AS total_revenue
 FROM gold.fact_sales f
-LEFT JOIN gold.dim_products p
-ON p.product_key=f.product_key
+LEFT JOIN gold.dim_products p ON p.product_key = f.product_key
 GROUP BY p.product_name
-ORDER BY total_revenue ASC
+ORDER BY total_revenue ASC;
 
+-- Top 10 customers by revenue generated
+SELECT * 
+FROM (
+    SELECT 
+        c.customer_key,
+        c.first_name,
+        c.last_name,
+        SUM(f.sales_amount) AS total_revenue,
+        ROW_NUMBER() OVER(ORDER BY SUM(f.sales_amount) DESC) AS rank_customers
+    FROM gold.fact_sales f
+    LEFT JOIN gold.dim_customers c ON c.customer_key = f.customer_key
+    GROUP BY c.customer_key, c.first_name, c.last_name
+) t
+WHERE rank_customers <= 10;
 
-
--- find the top 10 customers who have generated the highest revenue
-SELECT * FROM (SELECT 
-c.customer_key,
-c.first_name,
-c.last_name,
-SUM(f.sales_amount) AS total_revenue,
-ROW_NUMBER() OVER(ORDER BY SUM(f.sales_amount) DESC) AS rank_customers
-FROM gold.fact_sales f
-LEFT JOIN gold.dim_customers c on c.customer_key=f.customer_key
-GROUP BY
-c.customer_key,
-c.first_name,
-c.last_name
-)t
-WHERE rank_customers <= 10
-
-
--- 3 customers with the fewest orders placed
-
-
+-- Bottom 3 customers with fewest orders placed
 SELECT TOP 3
-	c.customer_key,
-	c.first_name,
-	c.last_name,
-	COUNT(DISTINCT(f.order_number)) AS total_orders 
+    c.customer_key,
+    c.first_name,
+    c.last_name,
+    COUNT(DISTINCT f.order_number) AS total_orders 
 FROM gold.fact_sales f
-LEFT JOIN gold.dim_customers c ON c.customer_key=f.customer_key
-GROUP BY  c.customer_key,
-c.first_name,
-c.last_name
-ORDER BY total_orders
+LEFT JOIN gold.dim_customers c ON c.customer_key = f.customer_key
+GROUP BY c.customer_key, c.first_name, c.last_name
+ORDER BY total_orders ASC;
 
+
+-- ============================================================================
+-- 6. ADVANCED ANALYTICS & PERFORMANCE TRENDS
+-- ============================================================================
+
+-- 6.1 Monthly Sales, Customer Count, and Quantity Breakdown
+SELECT 
+    YEAR(order_date) AS order_year,
+    MONTH(order_date) AS order_month,
+    SUM(sales_amount) AS total_sales,
+    COUNT(DISTINCT customer_key) AS total_customers,
+    SUM(quantity) AS total_quantity
+FROM gold.fact_sales
+WHERE order_date IS NOT NULL
+GROUP BY YEAR(order_date), MONTH(order_date)
+ORDER BY order_year, order_month;
+
+-- 6.2 Sales Trends: Running Total & Moving Average Price
+SELECT 
+    order_date,
+    total_sales,
+    SUM(total_sales) OVER (ORDER BY order_date) AS running_total_sales,
+    AVG(avg_price) OVER (ORDER BY order_date) AS moving_average_price
+FROM (
+    SELECT
+        DATETRUNC(YEAR, order_date) AS order_date,
+        SUM(sales_amount) AS total_sales,
+        AVG(price) AS avg_price
+    FROM gold.fact_sales
+    WHERE order_date IS NOT NULL
+    GROUP BY DATETRUNC(YEAR, order_date)
+) t;
+
+-- 6.3 Yearly Product Performance: YoY Comparison & Benchmark Analysis
+WITH yearly_product_sales AS (
+    SELECT  
+        YEAR(f.order_date) AS order_year,
+        p.product_name,
+        SUM(f.sales_amount) AS current_sales
+    FROM gold.fact_sales f 
+    LEFT JOIN gold.dim_products p ON f.product_key = p.product_key
+    WHERE f.order_date IS NOT NULL
+    GROUP BY YEAR(f.order_date), p.product_name
+)
+SELECT 
+    order_year,
+    product_name,
+    current_sales,
+    AVG(current_sales) OVER (PARTITION BY product_name) AS avg_sales,
+    current_sales - AVG(current_sales) OVER (PARTITION BY product_name) AS diff_avg,
+    CASE 
+        WHEN current_sales - AVG(current_sales) OVER (PARTITION BY product_name) > 0 THEN 'Above Avg'
+        WHEN current_sales - AVG(current_sales) OVER (PARTITION BY product_name) < 0 THEN 'Below Avg'
+        ELSE 'Avg'
+    END AS avg_change,
+    
+    -- Year-over-Year Analysis
+    LAG(current_sales) OVER (PARTITION BY product_name ORDER BY order_year) AS py_sales,
+    current_sales - LAG(current_sales) OVER (PARTITION BY product_name ORDER BY order_year) AS diff_py,
+    CASE 
+        WHEN current_sales - LAG(current_sales) OVER (PARTITION BY product_name ORDER BY order_year) > 0 THEN 'Increase'
+        WHEN current_sales - LAG(current_sales) OVER (PARTITION BY product_name ORDER BY order_year) < 0 THEN 'Decrease'
+        ELSE 'No Change'
+    END AS py_change
+FROM yearly_product_sales
+ORDER BY product_name, order_year;
+
+-- 6.4 Part-to-Whole Analysis: Category Sales Contribution Percentage
+WITH category_sales AS (
+    SELECT 
+        category,
+        SUM(sales_amount) AS total_sales
+    FROM gold.fact_sales f
+    LEFT JOIN gold.dim_products p ON p.product_key = f.product_key
+    GROUP BY category
+)
+SELECT 
+    category,
+    total_sales,
+    SUM(total_sales) OVER() AS overall_sales,
+    CONCAT(ROUND((CAST(total_sales AS FLOAT) / SUM(total_sales) OVER ()) * 100, 2), '%') AS percentage_of_total
+FROM category_sales
+ORDER BY total_sales DESC;
+
+-- 6.5 Product Cost Range Segmentation
+WITH product_segments AS (
+    SELECT 
+        product_key,
+        product_name,
+        cost,
+        CASE 
+            WHEN cost < 100 THEN 'Below 100'
+            WHEN cost BETWEEN 100 AND 500 THEN '100-500'
+            WHEN cost BETWEEN 500 AND 1000 THEN '500-1000'
+            ELSE 'Above 1000'
+        END AS cost_range
+    FROM gold.dim_products
+)
+SELECT 
+    cost_range,
+    COUNT(product_key) AS total_products
+FROM product_segments
+GROUP BY cost_range 
+ORDER BY total_products DESC;
+
+-- 6.6 Customer Behavioral Segmentation (VIP, Regular, New)
+WITH customer_spending AS (
+    SELECT 
+        c.customer_key,
+        SUM(f.sales_amount) AS total_spending,
+        MIN(order_date) AS first_order,
+        MAX(order_date) AS last_order,
+        DATEDIFF(month, MIN(order_date), MAX(order_date)) AS lifespan
+    FROM gold.fact_sales f
+    LEFT JOIN gold.dim_customers c ON f.customer_key = c.customer_key
+    GROUP BY c.customer_key
+)
+SELECT
+    customer_segment,
+    COUNT(customer_key) AS total_customers 
+FROM (
+    SELECT 
+        customer_key,
+        CASE 
+            WHEN lifespan >= 12 AND total_spending > 5000 THEN 'VIP'
+            WHEN lifespan >= 12 AND total_spending <= 5000 THEN 'Regular'
+            ELSE 'New'
+        END AS customer_segment
+    FROM customer_spending
+) AS sub
+GROUP BY customer_segment
+ORDER BY total_customers DESC;
